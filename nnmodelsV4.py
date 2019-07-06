@@ -37,6 +37,10 @@ class NNModel(object):
         used to identify the model with keys activityCategory, sensor, activityName
     sensorChannels : int
         number of sensors per IMU
+    errorMaxThreshold : float
+        if the prediction error is higher than this threshold it means that the activity 
+        being performed is not the activity the instance of NNmodel represents  
+
 
     Methods
     -------
@@ -77,6 +81,7 @@ class NNModel(object):
         self.lookback = lookback
         self.trainMean = None
         self.trainStd = None
+        self. errorMaxThreshold = None
 
         self.model.summary()
 
