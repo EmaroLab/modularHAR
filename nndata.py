@@ -129,11 +129,29 @@ class SamplesAndTargetsGenerator(object):
         # The testing dataset is composed of data from subjects 2 and 3 (ADL4, ADL5).
         idx = pd.IndexSlice
 
-        trainDf1 = self.sensorDf.loc[idx['S1':'S4', ('ADL1','ADL2','ADL3','Drill')], :]
-        trainDf2 = self.sensorDf.loc[idx[('S1','S4'), ('ADL4','ADL5')], :]
-        self.trainDf = pd.concat([trainDf1,trainDf2])
+        # leave out: final test set (P01 S1), (P02 S2), (P03 S3), (P04, S4), (P05 S1), (P06 S4);
+        #            evaluation matrix test set (P07 S1), (P08 S4);
+        #            system tuning test set (P09 S2), (P10 S3); 
+        # remember P06 is not part of the dataset (faulty data from rt)
+        trainDfList = []
+        trainDfList.append(self.sensorDf.loc[idx['P01', ('S2','S3','S4')], :]) # leave out S1
+        trainDfList.append(self.sensorDf.loc[idx['P02', ('S1','S3','S4')], :]) # leave out S2
+        trainDfList.append(self.sensorDf.loc[idx['P03', ('S1','S2','S4')], :]) # leave out S3
+        trainDfList.append(self.sensorDf.loc[idx['P04', ('S1','S2','S3')], :]) # leave out S4
+        trainDfList.append(self.sensorDf.loc[idx['P05', ('S2','S3','S4')], :]) # leave out S1
+        trainDfList.append(self.sensorDf.loc[idx['P06', ('S1','S2','S3')], :]) # leave out S4
+        trainDfList.append(self.sensorDf.loc[idx['P07', ('S2','S3','S4')], :]) # leave out S1
+        trainDfList.append(self.sensorDf.loc[idx['P08', ('S1','S2','S3')], :]) # leave out S4
+        trainDfList.append(self.sensorDf.loc[idx['P09', ('S1','S3','S4')], :]) # leave out S2
+        trainDfList.append(self.sensorDf.loc[idx['P10', ('S1','S2','S4')], :]) # leave out S3
+        self.trainDf = pd.concat(trainDfList)
 
-        self.testDf = self.sensorDf.loc[idx[('S2'), ('ADL4','ADL5')], :]   # leave aout 'S3' for further test 
+        # evaluation matrix test set (P07 S1), (P08 S4);
+        testEvalMatrixDfList = []
+        testEvalMatrixDfList.append(self.sensorDf.loc[idx['P07', 'S1'], :])
+        testEvalMatrixDfList.append(self.sensorDf.loc[idx['P08', 'S4'], :])
+        self.testDf = pd.concat(testEvalMatrixDfList)
+   
 
     def setActivityCategory(self, activityCategory):
         self.activityCategory = activityCategory
@@ -321,6 +339,31 @@ class FileData(object):
         
         evalDfActivityCategoryFilepath =  os.path.join(evalDfActivityCategoryFolderPath, f"evalDf__{evalDfDescription}.csv")
         dataframe.to_csv(evalDfActivityCategoryFilepath) 
+    
+    def saveConfusionMatrixDf(self, dataframe, baseDir = ''):
+        confusionMatrixDfFolderPath = os.path.join(baseDir, self.rootPath, "confusionMatrix")
+        try:
+            os.makedirs(confusionMatrixDfFolderPath)
+        except FileExistsError:
+            # directory already exists
+            pass
+        
+        confusionMatrixDfDescription = f"{self.sensor}_lb{self.lookback}_loss{self.loss}_{self.scaling}"
+        confusionMatrixDfSensorFilepath =  os.path.join(confusionMatrixDfFolderPath, f"evalDf__{confusionMatrixDfDescription}.csv")
+        
+        dataframe.to_csv( confusionMatrixDfSensorFilepath)  
+
+        # save to activity category file path for easier comparison
+        confusionMatrixDfActivityCategoryFolderPath = os.path.join(baseDir, f"Data/{self.activityCategory}", "confusionMatrix")
+        try:
+            os.makedirs(confusionMatrixDfActivityCategoryFolderPath)
+        except FileExistsError:
+            # directory already exists
+            pass
+        
+        confusionMatrixDfActivityCategoryFilepath =  os.path.join(confusionMatrixDfActivityCategoryFolderPath, f"evalDf__{confusionMatrixDfDescription}.csv")
+        dataframe.to_csv(confusionMatrixDfActivityCategoryFilepath) 
+
 
     def saveEvaluationHeatmap(self, dataframe,baseDir = ''):
         evalHeatmapFolderPath = os.path.join(baseDir, f"Data/{self.activityCategory}", "evaluation")
