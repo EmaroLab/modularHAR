@@ -25,14 +25,14 @@ from nnmodelsV4 import NNModel, LSTMModelFactory, BaseCallbacksListFactory, save
 from evaluation import Results
 
 # Import dataframe with all IMU sensors and labels 
-imuSensorsDataFrame = pd.read_csv('IMUSsensorsWithQuaternions.csv', header = [0,1], index_col = [0,1,2])
+imuSensorsDataFrame = pd.read_csv('imuSensorsWithQuaternions.csv', header = [0,1], index_col = [0,1,2])
 
 # Fill nans with zeroes
 imuSensorsDataFrame = imuSensorsDataFrame.fillna(0)
 
 # User (set sensor, activity category)
-activityCategory = 'locomotion'
-sensors = ['backImu', 'rlaImu', 'ruaImu', 'llaImu', 'luaImu']
+activityCategory = 'BothArmsLabel'
+sensors = ['backImu', 'rlaImu', 'ruaImu', 'llaImu', 'luaImu', 'rtImu']
 
 # Grid Search (model hyperparameters)
 lookbacks = [30]
@@ -125,10 +125,12 @@ for sensor in sensors:
         results = Results(activityModels, activityNames)
         
         results.setSamplesAndTargestLists(testSamplesList, testTargetsList)
+        
         evalDf = results.getEvaluationDf()
-
-        # Save evaluation dataframe to sensor folder
-        fileData.saveEvaluationDf(evalDf)
+        fileData.saveEvaluationDf(evalDf)  # Save evaluation dataframe to csv file 
 
         # Save evaluation heatmap to activity category folder
         # fileData.saveEvaluationHeatmap(evalDf)
+
+        confusionMatrixDf = results.getConfusionMatrix()
+        fileData.saveConfusionMatrixDf(confusionMatrixDf) # Save confusion matrix dataframe to csv file 
