@@ -1,4 +1,4 @@
-import pandas
+import pandas as pd
 import numpy as np
 from numpy_ringbuffer import RingBuffer
 from abc import ABC
@@ -519,35 +519,54 @@ class PyPlotter(object):
         self.imuSensors = IMUSensors(imuSensorsDataFrame)
         self.activities = Activities()
         self.groundTruthFreq = groundTruthFreq
+        self.person = person
+        self.session = session
 
         self.colorDict = {
-            'locomotion' : {
-                 0 : 'k', # 'nullActivity'
-                 1 : 'g', # 'stand'       
-                 2 : 'b', # 'walk'        
-                 4 : 'r', # 'sit'         
-                 5 : 'y', # 'lie'         
+            'BothArmsLabel' : {
+             0       : 'k',             # 'nullActivity'   
+             1   : 'g',          # 'Walk'    
+             2 : '#FC33FF',            # 'SitDown'   
+             3   : 'b',          # 'StandUp' 
+             4 :  '#33FFE3',            # 'OpenDoor'    
+             5    : 'r',         # 'CloseDoor'      
+             6    : 'y',         # 'PourWater'        
+             7    : 'm',         # 'DrinkGlass'       
+             8    : 'c',         # 'BruskTeeth'  
+             9   : '#581845',    # 'CleanTable'       
             },
 
-            'mlBothArms' : {
+            'RightArmLabel' : {
              0       : 'k',             # 'nullActivity'   
-             406516   : 'g',          # 'OpenDoor1'    
-             406517 : 'k',            # 'OpenDoor2' (nullActivity)     
-             404516   : 'b',          # 'CloseDoor1' 
-             404517 : 'k',            # 'CloseDoor2' (nullActivity)     
-             406520    : 'r',         # 'OpenFridge'      
-             404520    : 'y',         # 'CloseFridge'        
-             406505    : 'm',         # 'OpenDishwasher'       
-             404505    : 'c',         # 'CloseDishwasher'  
-             406519   : '#581845',    # 'OpenDrawer1'    
-             404519   : '#FC33FF',    # 'CloseDrawer1'   
-             406511 : 'k',             #'OpenDrawer2'     (nullActivity)
-             404511 : 'k',             # 'CloseDrawer2'   (nullActivity)
-             406508 : 'k',             # 'OpenDrawer3'    (nullActivity)
-             404508 : 'k',             # 'CloseDrawer3'   (nullActivity)
-             408512    : '#33FFE3',   # 'CleanTable'     
-             407521   : '#FFC300',    # 'DrinkfromCup'   
-             405506    : '#5BFB05',   # 'ToggleSwitch'   
+             1   : 'g',          # 'Walk'    
+             2 : '#FC33FF',            # 'SitDown' 
+             3   : 'b',          # 'StandUp' 
+             4 :  '#33FFE3',            # 'OpenDoor' 
+             5    : 'r',         # 'CloseDoor'      
+             6    : 'y',         # 'PourWater'        
+             7    : 'm',         # 'DrinkGlass'       
+             8    : 'c',         # 'BruskTeeth'  
+             9   : '#581845',    # 'CleanTable'       
+            },
+
+            'LeftArmLabel' : {
+             0       : 'k',             # 'nullActivity'   
+             1   : 'g',          # 'Walk'    
+             2 : '#FC33FF',            # 'SitDown'     
+             3   : 'b',          # 'StandUp' 
+             4 :  '#33FFE3',            # 'OpenDoor'  
+             5    : 'r',         # 'CloseDoor'      
+             6    : 'y',         # 'PourWater'        
+             7    : 'm',         # 'DrinkGlass'       
+             8    : 'c',         # 'BruskTeeth'  
+             9   : '#581845',    # 'CleanTable'       
+            },
+
+            'Locomotion' : {
+             0       : 'k',             # 'nullActivity'   
+             1   : 'g',          # 'Walk'    
+             2 : '#FC33FF',            # 'SitDown' (nullActivity)     
+             3   : 'b',          # 'StandUp' 
             },
         }
     
@@ -573,7 +592,6 @@ class PyPlotter(object):
         """
         predfreq = self.groundTruthFreq / windowLength
 
-        sensorName = sensorSystem.identifier['sensor']
         activityNames = [activityModule.identifier['activityName'] for activityModule in sensorSystem.activityModules]
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot(1, 1, 1)
@@ -586,8 +604,9 @@ class PyPlotter(object):
                      self.colorDict[self.activityCategory][activityId], label=activityNames[i])
         
         # find the slices of the groudtruth (groundtruth is at sensor frequency)
-        sensorImuDf = self.imuSensors.singleSensorDf(sensorName)
-        trueMultiLabelSequence = MultiLabelSequence(sensorImuDf['labels', self.activityCategory].values[tiPlot:tfPlot])
+        idx = pd.IndexSlice
+        trueLablesSequence = self.imuSensorsDataFrame.loc[idx[self.person, self.session, :], idx['labels', self.activityCategory]].values[tiPlot:tfPlot]
+        trueMultiLabelSequence = MultiLabelSequence(trueLablesSequence)
         trueSlices, trueLabels = trueMultiLabelSequence.getSlicesAndLabelsLists()
 
         # find the slices of the predicted labels
@@ -602,7 +621,7 @@ class PyPlotter(object):
         for i, item in enumerate(trueSlices):
             plt.axvspan((item.start + tiPlot)/self.groundTruthFreq, (item.stop + tiPlot)/self.groundTruthFreq,   # divide by the sensor frequency to obtain the time in seconds                          
                         facecolor=self.colorDict[self.activityCategory][trueLabels[i]], 
-                        alpha=0.3, 
+                        #alpha=0.3, 
                         ymin=0, ymax=0.5)
 
         # plot the predicted labels as background colors in the bottom half of the plot 
@@ -611,7 +630,7 @@ class PyPlotter(object):
             # at predfrequency = sensorfrequency / windowlength  
             plt.axvspan((item.start/predfreq + tiPlot/self.groundTruthFreq), (item.stop/predfreq + tiPlot/self.groundTruthFreq),                            
                         facecolor=self.colorDict[self.activityCategory][predictedLabels[i]], 
-                        alpha=0.3, 
+                        #alpha=0.3, 
                         ymin=0.5, ymax=1)
 
         plt.text(tiPlot/self.groundTruthFreq, 0.75*top, r'PREDICTED', fontsize = 20)
@@ -643,8 +662,9 @@ class PyPlotter(object):
         ax = fig.add_subplot(1, 1, 1)
 
         # find the slices of the groudtruth
-        truLablesSequence = self.imuSensorsDataFrame['labels', self.activityCategory].values[tiPlot:tfPlot]
-        trueMultiLabelSequence = MultiLabelSequence(truLablesSequence)
+        idx = pd.IndexSlice
+        trueLablesSequence = self.imuSensorsDataFrame.loc[idx[self.person, self.session, :], idx['labels', self.activityCategory]].values[tiPlot:tfPlot]
+        trueMultiLabelSequence = MultiLabelSequence(trueLablesSequence)
         trueSlices, trueLabels = trueMultiLabelSequence.getSlicesAndLabelsLists()
 
         # find the slices of the predicted labels
@@ -656,14 +676,14 @@ class PyPlotter(object):
         for i, item in enumerate(trueSlices):
             plt.axvspan((item.start + tiPlot)/self.groundTruthFreq, (item.stop + tiPlot)/self.groundTruthFreq, 
                         facecolor=self.colorDict[self.activityCategory][trueLabels[i]], 
-                        alpha=0.3, 
+                        #alpha=0.3, 
                         ymin=0, ymax=0.5)
 
         # plot the predicted labels as background colors in the bottom half of the plot 
         for i, item in enumerate(predictedSlices):
             plt.axvspan((item.start/predfreq + tiPlot/self.groundTruthFreq), (item.stop/predfreq + tiPlot/self.groundTruthFreq),                            
                         facecolor=self.colorDict[self.activityCategory][predictedLabels[i]], 
-                        alpha=0.3, 
+                        #alpha=0.3, 
                         ymin=0.5, ymax=1)
 
         plt.text(tiPlot/self.groundTruthFreq, 0.75*top, r'PREDICTED', fontsize = 20)
