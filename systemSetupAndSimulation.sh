@@ -26,13 +26,13 @@ baseDir = 'NNModels'   # NNModels base directory
 
 #*****************************************************************************
 #SYSTEM SPECIFICS
-person = 'S1'
-session ='ADL1'
+person = 'P10'
+session ='S3'
 
-activityCategory = 'mlBothArms' # 'locomotion' or 'mlBothArms'
-sensorNames = ['backImu' , 'rlaImu'] # , 'ruaImu', 'llaImu', 'luaImu']
+activityCategory = 'Locomotion' # BothArmsLabel, RightArmLabel, LeftArmLabel, Locomotion
+sensorNames = ['backImu' , 'llaImu', 'luaImu', 'rtImu', 'rlaImu', 'ruaImu'] #, 'llaImu', 'luaImu' , 'ruaImu', 'llaImu', 'luaImu']
 
-lookback = 30
+lookback = 15
 sensorChannels = 6
 
 # Activities (get all activityNames)
@@ -40,15 +40,15 @@ activities = Activities()
 activityNames = activities.getNamesWithCategory(activityCategory)
 
 # Select subsamples of activities (only for 'mlBothArms' activity Category)
-ind = np.array([0,2,4,5,6,7,8,9,14,15,16])
-activityNames = np.array(activityNames)[ind]
+#ind = np.array([0,1,2])
+#activityNames = np.array(activityNames)[ind]
 
 print('\nSELECTED activity names:\n', activityNames)
 
 classifyStrategy = ArgMinStrategy()
 reasonerSelectionStartegy = MostFrequentStrategy()
 windowSelectionStrategy = MostFrequentStrategy()
-windowLength = 15
+windowLength = 1
 
 #*****************************************************************************
 # SYSTEM SETUP
@@ -75,7 +75,7 @@ for sensorName in sensorNames:
 
 
 # setup of the Sensors
-imuSensorsDataFrame = pd.read_csv('IMUSsensorsWithQuaternions.csv', header = [0,1], index_col = [0,1,2])
+imuSensorsDataFrame = pd.read_csv('imuSensorsWithQuaternions.csv', header = [0,1], index_col = [0,1,2])
 imuSensors = IMUSensors(imuSensorsDataFrame)
 idx = pd.IndexSlice
 identifier.pop('activityName')   # remove activityName from keys
@@ -91,9 +91,10 @@ reasoner = Reasoner(reasonerSelectionStartegy)
 #*****************************************************************************
 # SIMULATION
 
-# sensor freq =  30 Hz -> 30 steps per second
-tiSim = 3000   # simulation initial timestep (sec = timsteps / freq)
-tfSim = 3150   # simulation final  timestep (sec = timsteps / freq)
+# 
+tiSim = 0   # simulation initial timestep (sec = timsteps / freq)
+tfSim = 100   # simulation final  timestep (sec = timsteps / freq)
+#tfSim = len(imuSensorsDataFrame.loc[idx[person, session], :].values)
 
 # errors per sensor and per activity at sensor frequency
 sensorSystemsErrors = np.empty((len(sensors), tfSim-tiSim, len(activityNames)))
@@ -124,8 +125,8 @@ for t in range(tiSim, tfSim):
 
 #*****************************************************************************
 # PLOT
-tiPlot = 3030 # times step (30 Hz -> 30 steps per second) sec = timsteps / freq
-tfPlot = 3120 # times step (30 Hz -> 30 steps per second) sec = timsteps / freq
+tiPlot = tiSim # times step (30 Hz -> 30 steps per second) sec = timsteps / freq
+tfPlot = tfSim # times step (30 Hz -> 30 steps per second) sec = timsteps / freq
 
 pyplotter = PyPlotter(tiSim, tfSim, activityCategory, imuSensorsDataFrame, person, session)
 for i in range(len(sensorSystems)):
@@ -143,6 +144,60 @@ pyplotter.plotSelectedVsTrue(windowResultantActivityName,
                              figsize = (20,5), 
                              top = 2, 
                              toFile = True)
+
+#*****************************************************************************
+# CLASSIFICATION
+
+activityNumToLabelDict = {
+                0 : 'nullActivity',
+                1 : 'Walk',
+                2 : 'SitDown',
+                3 : 'StandUp' ,
+                4 : 'OpenDoor',
+                5 : 'CloseDoor',
+                6 : 'PourWater',
+                7 : 'DrinkGlass',
+                8 : 'BrushTeeth',
+                9 : 'CleanTable',
+                    }
+
+# find the slices of the groudtruth
+idx = pd.IndexSlice
+actualLabelsNumIdDf = imuSensorsDataFrame.loc[idx[person, session], idx['labels', activityCategory]] # obtain the session dataframe
+actualLabelsDf = actualLabelsNumIdDf.replace(activityNumToLabelDict, inplace=False)  # replace id numbers with activity labels
+actualLabels = actualLabelsDf.values[tiSim:tfSim]   # select the sequence corresponding to the simulation
+
+# labels predicted by the voting scheme
+maxVotingPredictedLabels = windowResultantActivityName
+
+# initialize max voting confusion matrix dataframe (include nullActivity)
+activityNamesWithNullActivity = activityNames + ['nullActivity']
+n = len(activityNames) + 1
+maxVotingConfusionMatrixDf = pd.DataFrame(np.zeros((n,n)), columns = activityNamesWithNullActivity, index = activityNamesWithNullActivity)
+maxVotingConfusionMatrixDf.columns.name = 'TRUE'
+maxVotingConfusionMatrixDf.index.name = 'PREDICTED'
+
+# fill max voting confusion matrix
+for i in range(len(maxVotingPredictedLabels)):
+    maxVotingConfusionMatrixDf.loc[idx[maxVotingPredictedLabels[i]], idx[actualLabels[i]]] += 1
+
+maxVotingConfusionMatrixDf.to_csv(f'max_voting_confusion_matrix.csv')
+
+
+for i, sensor in enumerate(sensorNames):
+    # labels predicted by i-th sensor module
+    sensorPredictedLabels = windowSelectedActivityName[:,i]
+
+    # initialize i-th sensor confusion matrix
+    sensorConfusionMatrixDf = pd.DataFrame(np.zeros((n,n)), columns = activityNamesWithNullActivity, index = activityNamesWithNullActivity)
+    sensorConfusionMatrixDf.columns.name = 'TRUE'
+    sensorConfusionMatrixDf.index.name = 'PREDICTED'
+
+    # fill i-th sensor confusion matrix
+    for i in range(len(sensorPredictedLabels)):
+        sensorConfusionMatrixDf.loc[idx[sensorPredictedLabels[i]], idx[actualLabels[i]]] += 1
+
+    sensorConfusionMatrixDf.to_csv(f'{sensor}_confusion_matrix.csv')
 
 
 
