@@ -1,4 +1,4 @@
-./systemSetupAndSimulationSaveErrorsBothArmsLabel.sh
-./systemSetupAndSimulationSaveErrorsLeftArmLabel.sh
-./systemSetupAndSimulationSaveErrorsRightArmLabel.sh
+./systemSetupAndSimulationSaveErrorsBothArms.sh
+./systemSetupAndSimulationSaveErrorsLeftArm.sh
+./systemSetupAndSimulationSaveErrorsRightArm.sh
 ./systemSetupAndSimulationSaveErrorsLocomotion.sh
