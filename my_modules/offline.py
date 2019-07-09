@@ -512,7 +512,7 @@ class ProbabilityEvaluator(object):
     
 class PyPlotter(object):
     """a class that represents the scope of he simulation"""
-    def __init__(self, tiSim, tfSim, activityCategory, imuSensorsDataFrame, person, session, windowLength = 1, lookback = 15, groundTruthFreq = 30):
+    def __init__(self, tiSim, tfSim, activityCategory, imuSensorsDataFrame, person, session, windowLength = 1, lookback = 15, groundTruthFreq = 30, baseDir = ''):
         self.tiSim = tiSim
         self.tfSim = tfSim
         self.activityCategory = activityCategory
@@ -522,7 +522,7 @@ class PyPlotter(object):
         self.groundTruthFreq = groundTruthFreq
         self.person = person
         self.session = session
-        self.simulationResults = SimulationResults(activityCategory, person, session, windowLength, lookback)
+        self.simulationResults = SimulationResults(activityCategory, person, session, windowLength, lookback, baseDir=baseDir)
         self.colorDict = {
             'BothArmsLabel' : {
              0       : 'k',             # 'nullActivity'   
