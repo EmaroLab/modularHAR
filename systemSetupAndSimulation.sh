@@ -3,24 +3,25 @@
 import keras
 import pandas as pd
 import numpy as np
+import itertools
 
-import preprocessdata
-import nnmodelsV4
-import offline
+import  my_modules.preprocessdata
+import  my_modules.nnmodelsV4
+import  my_modules.offline
 
-from preprocessdata import Activities, IMUSensors
-from nnmodelsV4 import NNModel, LSTMModelFactory, BaseCallbacksListFactory, loadNNModel
-from offline import ActivityModule, Classifier, Sensor, ArgMinStrategy, SingleSensorSystem, PyPlotter
+from  my_modules.preprocessdata import Activities, IMUSensors
+from  my_modules.nnmodelsV4 import NNModel, LSTMModelFactory, BaseCallbacksListFactory, loadNNModel
+from  my_modules.offline import ActivityModule, Classifier, Sensor, ArgMinStrategy, SingleSensorSystem, Reasoner, PyPlotter, MostFrequentStrategy, WindowSelector, SimulationResults
 
-# reload modules (useful for development)
-import importlib
-importlib.reload(preprocessdata)
-importlib.reload(nnmodelsV4)
-importlib.reload(offline)
+# # reload modules (useful for development)
+# import importlib
+# importlib.reload(preprocessdata)
+# importlib.reload(nnmodelsV4)
+# importlib.reload(offline)
 
-from preprocessdata import Activities, IMUSensors
-from nnmodelsV4 import NNModel, LSTMModelFactory, BaseCallbacksListFactory, loadNNModel
-from offline import ActivityModule, Classifier, Sensor, ArgMinStrategy, SingleSensorSystem, PyPlotter, Reasoner, MostFrequentStrategy, WindowSelector
+# from preprocessdata import Activities, IMUSensors
+# from nnmodelsV4 import NNModel, LSTMModelFactory, BaseCallbacksListFactory, loadNNModel
+# from offline import ActivityModule, Classifier, Sensor, ArgMinStrategy, SingleSensorSystem, PyPlotter, Reasoner, MostFrequentStrategy, WindowSelector
 
 baseDir = 'NNModels'   # NNModels base directory
 
@@ -29,18 +30,19 @@ baseDir = 'NNModels'   # NNModels base directory
 person = 'P10'
 session ='S3'
 
-activityCategory = 'Locomotion' # BothArmsLabel, RightArmLabel, LeftArmLabel, Locomotion
-sensorNames = ['backImu' , 'llaImu', 'luaImu', 'rtImu', 'rlaImu', 'ruaImu'] #, 'llaImu', 'luaImu' , 'ruaImu', 'llaImu', 'luaImu']
-
 lookback = 15
 sensorChannels = 6
+
+activityCategory = 'Locomotion' # BothArmsLabel, RightArmLabel, LeftArmLabel, Locomotion
+sensorNames = ['backImu' , 'llaImu', 'luaImu', 'rtImu', 'rlaImu', 'ruaImu'] 
 
 # Activities (get all activityNames)
 activities = Activities()
 activityNames = activities.getNamesWithCategory(activityCategory)
 
 # Select subsamples of activities (only for 'mlBothArms' activity Category)
-#ind = np.array([0,1,2])
+#ind = np.array([5,6,8]) # LeftArmLabel
+#ind = np.array([3,4,5,6,7,8]) # RightArmLabel 
 #activityNames = np.array(activityNames)[ind]
 
 print('\nSELECTED activity names:\n', activityNames)
@@ -93,8 +95,8 @@ reasoner = Reasoner(reasonerSelectionStartegy)
 
 # 
 tiSim = 0   # simulation initial timestep (sec = timsteps / freq)
-tfSim = 100   # simulation final  timestep (sec = timsteps / freq)
-#tfSim = len(imuSensorsDataFrame.loc[idx[person, session], :].values)
+#tfSim = 100   # simulation final  timestep (sec = timsteps / freq)
+tfSim = len(imuSensorsDataFrame.loc[idx[person, session], :].values)
 
 # errors per sensor and per activity at sensor frequency
 sensorSystemsErrors = np.empty((len(sensors), tfSim-tiSim, len(activityNames)))
@@ -124,11 +126,13 @@ for t in range(tiSim, tfSim):
         windowResultantActivityName[(t - tiSim) // windowLength] = reasoner.selectActivity(windowSelectedActivityName[(t - tiSim) // windowLength,:])
 
 #*****************************************************************************
+simulationResults = SimulationResults(activityCategory, person, session, windowLength, lookback)
+
 # PLOT
 tiPlot = tiSim # times step (30 Hz -> 30 steps per second) sec = timsteps / freq
 tfPlot = tfSim # times step (30 Hz -> 30 steps per second) sec = timsteps / freq
 
-pyplotter = PyPlotter(tiSim, tfSim, activityCategory, imuSensorsDataFrame, person, session)
+pyplotter = PyPlotter(tiSim, tfSim, activityCategory, imuSensorsDataFrame, person, session, windowLength = windowLength, lookback = lookback)
 for i in range(len(sensorSystems)):
     pyplotter.plotSensorSystemErrors(sensorSystems[i], 
                                      sensorSystemsErrors[i,:,:], 
@@ -168,7 +172,8 @@ actualLabelsDf = actualLabelsNumIdDf.replace(activityNumToLabelDict, inplace=Fal
 actualLabels = actualLabelsDf.values[tiSim:tfSim]   # select the sequence corresponding to the simulation
 
 # labels predicted by the voting scheme
-maxVotingPredictedLabels = windowResultantActivityName
+maxVotingPredictedLabels = [[ResultantActivityName] * windowLength for ResultantActivityName in windowResultantActivityName] # windowResultantActivityName has one item each windowLengthTimesteps
+maxVotingPredictedLabels = list(itertools.chain.from_iterable(maxVotingPredictedLabels))
 
 # initialize max voting confusion matrix dataframe (include nullActivity)
 activityNamesWithNullActivity = activityNames + ['nullActivity']
@@ -181,7 +186,8 @@ maxVotingConfusionMatrixDf.index.name = 'PREDICTED'
 for i in range(len(maxVotingPredictedLabels)):
     maxVotingConfusionMatrixDf.loc[idx[maxVotingPredictedLabels[i]], idx[actualLabels[i]]] += 1
 
-maxVotingConfusionMatrixDf.to_csv(f'max_voting_confusion_matrix.csv')
+simulationResults.saveMaxVotingConfusionMatrixDf(maxVotingConfusionMatrixDf) 
+# maxVotingConfusionMatrixDf.to_csv(f'max_voting_confusion_matrix.csv')
 
 
 for i, sensor in enumerate(sensorNames):
@@ -197,7 +203,8 @@ for i, sensor in enumerate(sensorNames):
     for i in range(len(sensorPredictedLabels)):
         sensorConfusionMatrixDf.loc[idx[sensorPredictedLabels[i]], idx[actualLabels[i]]] += 1
 
-    sensorConfusionMatrixDf.to_csv(f'{sensor}_confusion_matrix.csv')
+    simulationResults.saveSensorConfusionMatrixDf(sensorConfusionMatrixDf, sensor)
+    # sensorConfusionMatrixDf.to_csv(f'{sensor}_confusion_matrix.csv')
 
 
 

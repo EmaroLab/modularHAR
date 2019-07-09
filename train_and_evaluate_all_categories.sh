@@ -1,0 +1,4 @@
+./multisensor_training_and_evaluation_RightArm.sh
+./multisensor_training_and_evaluation_LeftArm.sh
+./multisensor_training_and_evaluation_Locomotion.sh
+./multisensor_training_and_evaluation_BothArms.sh 
