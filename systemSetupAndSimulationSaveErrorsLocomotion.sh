@@ -116,8 +116,8 @@ for person, session in personsSessions:
 
     
     tiSim = 0   # simulation initial timestep (sec = timsteps / freq)
-    tfSim = 10   # simulation final  timestep (sec = timsteps / freq)
-    #tfSim = len(imuSensorsDataFrame.loc[idx[person, session], :].values)
+    #tfSim = 10   # simulation final  timestep (sec = timsteps / freq)
+    tfSim = len(imuSensorsDataFrame.loc[idx[person, session], :].values)
 
     # errors per sensor and per activity at sensor frequency
     sensorSystemsErrors = np.empty((len(sensors), tfSim-tiSim, len(activityNames)))
