@@ -24,7 +24,7 @@ from my_modules.offline import ActivityModule, Classifier, Sensor, ArgMinStrateg
 # from offline import ActivityModule, Classifier, Sensor, ArgMinStrategy, SingleSensorSystem, PyPlotter, Reasoner, MostFrequentStrategy, WindowSelector
 
 baseDir = 'NNModels'   # NNModels base directory
-
+simulationResultsbaseDir = 'no_threshold_simulation_results'
 #*****************************************************************************
 #SYSTEM SPECIFICS
 person = 'P10'
@@ -133,7 +133,7 @@ for t in range(tiSim, tfSim):
 
 print('\nSIMULATION COMPLETE')
 #*****************************************************************************
-simulationResults = SimulationResults(activityCategory, person, session, windowLength, lookback)
+simulationResults = SimulationResults(activityCategory, person, session, windowLength, lookback, baseDir = simulationResultsbaseDir)
 
 # PLOT
 tiPlot = tiSim # times step (30 Hz -> 30 steps per second) sec = timsteps / freq

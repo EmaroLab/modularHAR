@@ -29,15 +29,15 @@ baseDir = 'NNModels'   # NNModels base directory
 #SYSTEM SPECIFICS
 personsSessions = [('P09', 'S2'), ('P10', 'S3')] # tuning set
 
-# testPersonsSessions = [('P01', 'S1'), ('P02', 'S2'), ('P03', 'S3'), ('P04', 'S4'), ('P05', 'S1'), ('P06', 'S4')] # final test set
-# evaluationPersonsSessions = [('P07', 'S1'), ('P08', 'S4')] # evaluation set
-# personsSessions = personsSessions + testPersonsSessions + evaluationPersonsSessions
+testPersonsSessions = [('P01', 'S1'), ('P02', 'S2'), ('P03', 'S3'), ('P04', 'S4'), ('P05', 'S1'), ('P06', 'S4')] # final test set
+evaluationPersonsSessions = [('P07', 'S1'), ('P08', 'S4')] # evaluation set
+personsSessions = personsSessions + testPersonsSessions + evaluationPersonsSessions
 
 lookback = 15
 sensorChannels = 6
 
 # Choose activity category from BothArmsLabel, RightArmLabel, LeftArmLabel, Locomotion
-activityCategory = 'LeftArmLabel' 
+activityCategory = 'BothArmsLabel' 
 
 # Choose Sensors among ['backImu' , 'llaImu', 'luaImu', 'rtImu', 'rlaImu', 'ruaImu'] 
 sensorNames = ['backImu' , 'llaImu', 'luaImu', 'rtImu', 'rlaImu', 'ruaImu'] 
