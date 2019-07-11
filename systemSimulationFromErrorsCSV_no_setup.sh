@@ -24,7 +24,6 @@ from my_modules.offline import ActivityModule, Classifier, Sensor, ArgMinStrateg
 # from offline import ActivityModule, Classifier, Sensor, ArgMinStrategy, SingleSensorSystem, PyPlotter, Reasoner, MostFrequentStrategy, WindowSelector
 
 baseDir = 'NNModels'   # NNModels base directory
-simulationResultsbaseDir = 'threshold100_simulation_results'
 #*****************************************************************************
 #SYSTEM SPECIFICS
 person = 'P10'
@@ -32,11 +31,19 @@ session ='S3'
 
 lookback = 15
 sensorChannels = 6
-windowLength = 1
+windowLength = 30
 errorThreshold = 100
+
+if errorThreshold < 1:
+    n = '0' + str(int(errorThreshold * 10))
+else:
+    n = str(errorThreshold) 
+
+simulationResultsbaseDir = f'threshold{n}_simulation_results'
 
 # Choose activity category from BothArmsLabel, RightArmLabel, LeftArmLabel, Locomotion
 activityCategory = 'Locomotion' 
+print(f'\nActivity Catgeory: {activityCategory}\n')
 
 # Choose Sensors among ['backImu' , 'llaImu', 'luaImu', 'rtImu', 'rlaImu', 'ruaImu'] 
 sensorNames = ['backImu' , 'llaImu', 'luaImu', 'rtImu', 'rlaImu', 'ruaImu'] 
@@ -49,7 +56,7 @@ classifyStrategy = ArgMinStrategy()
 reasonerSelectionStartegy = MostFrequentStrategy()
 windowSelectionStrategy = MostFrequentStrategy()
 #*****************************************************************************
-print('\nSYSTEM SETUP START\n')
+print(f'\n({person}, {session}) SYSTEM SETUP START\n')
 
 # SYSTEM SETUP
 
@@ -70,11 +77,11 @@ reasoner = Reasoner(reasonerSelectionStartegy)
 errorsDf = pd.read_csv(f'{activityCategory}_errors.csv', header = [0,1], index_col = [0,1])
 print(f'\n{activityCategory}_errors.csv LOADED')
 
-print('\nSYSTEM SETUP COMPLETE')
+print(f'\n({person}, {session}) SYSTEM SETUP COMPLETE')
 #*****************************************************************************
 # SIMULATION
 
-print('\nSIMULATION START')
+print(f'\n({person}, {session}) SIMULATION START')
 
 # 
 tiSim = 0   # simulation initial timestep (sec = timsteps / freq)
@@ -118,12 +125,12 @@ for t in range(tiSim, tfSim):
     if t % 100 == 0:
             print(f'simulation time {t}')
 
-print('\nSIMULATION COMPLETE')
+print(f'\n({person}, {session}) SIMULATION COMPLETE')
 #*****************************************************************************
 # instance of class to save plots and confusion matrix 
 simulationResults = SimulationResults(activityCategory, person, session, windowLength, lookback, baseDir = simulationResultsbaseDir)
 
-print('\nPLOT START')
+print(f'\n({person}, {session}) PLOT START')
 # PLOT
 tiPlot = tiSim # times step (30 Hz -> 30 steps per second) sec = timsteps / freq
 tfPlot = tfSim # times step (30 Hz -> 30 steps per second) sec = timsteps / freq
@@ -137,20 +144,24 @@ for i, sensorName in enumerate(sensorNames):
                                      tiPlot, tfPlot,
                                      windowLength=windowLength, 
                                      figsize = (20,5), top = 2, 
-                                     toFile = True)
+                                     toFile = True,
+                                     majorTicks = 5, 
+                                     minorTicks = 1 )
 
 pyplotter.plotSelectedVsTrue(windowResultantActivityName, 
                              tiPlot, tfPlot, 
                              windowLength=windowLength,
-                             figsize = (20,5), 
+                             figsize = (20, 5), 
                              top = 2, 
-                             toFile = True)
+                             toFile = True,
+                             majorTicks = 5, 
+                             minorTicks = 1 )
 
-print('\nPLOT END')
+print(f'\n({person}, {session}) PLOT END')
 #*****************************************************************************
 # CLASSIFICATION
 
-print('\nCONFUSION MARIX EVALUATION START')
+print(f'\n({person}, {session}) CONFUSION MARIX EVALUATION START')
 
 activityNumToLabelDict = {
                 0 : 'nullActivity',
@@ -206,7 +217,7 @@ for i, sensor in enumerate(sensorNames):
     simulationResults.saveSensorConfusionMatrixDf(sensorConfusionMatrixDf, sensor)
     #sensorConfusionMatrixDf.to_csv(f'{sensor}_confusion_matrix.csv')
 
-print('\nCONFUSION MARIX EVALUATION COMPLETE')
+print(f'\n({person}, {session}) CONFUSION MARIX EVALUATION COMPLETE')
 
 
 
