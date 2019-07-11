@@ -24,7 +24,7 @@ from my_modules.offline import ActivityModule, Classifier, Sensor, ArgMinStrateg
 # from offline import ActivityModule, Classifier, Sensor, ArgMinStrategy, SingleSensorSystem, PyPlotter, Reasoner, MostFrequentStrategy, WindowSelector
 
 baseDir = 'NNModels'   # NNModels base directory
-simulationResultsbaseDir = 'no_threshold_simulation_results'
+simulationResultsbaseDir = 'threshold1_simulation_results'
 #*****************************************************************************
 #SYSTEM SPECIFICS
 person = 'P10'
@@ -33,6 +33,7 @@ session ='S3'
 lookback = 15
 sensorChannels = 6
 windowLength = 1
+errorThreshold = 1
 
 # Choose activity category from BothArmsLabel, RightArmLabel, LeftArmLabel, Locomotion
 activityCategory = 'Locomotion' 
@@ -42,12 +43,7 @@ sensorNames = ['backImu' , 'llaImu', 'luaImu', 'rtImu', 'rlaImu', 'ruaImu']
 
 # Choose activities among ['Walk', 'SitDown', 'StandUp', 'OpenDoor', 'CloseDoor', 'PourWater', 'DrinkGlass', 'BrushTeeth', 'CleanTable']
 activityNames = ['Walk', 'SitDown', 'StandUp']
-
 print('\nSELECTED activity names:\n', activityNames, '\n')
-
-errorsDf = pd.read_csv(f'{activityCategory}_errors.csv', header = [0,1], index_col = [0,1])
-
-print(f'\n{activityCategory}_errors.csv LOADED\n')
 
 classifyStrategy = ArgMinStrategy()
 reasonerSelectionStartegy = MostFrequentStrategy()
@@ -77,19 +73,14 @@ for sensorName in sensorNames:
     classifiers.append(Classifier(classifyStrategy, sensor = sensorName, activityCategory = activityCategory))
     windowSelectors.append(WindowSelector(windowLength, windowSelectionStrategy,  sensor = sensorName, activityCategory = activityCategory))
 
-# # setup of the Sensors
+# load ground truth
 imuSensorsDataFrame = pd.read_csv('imuSensorsWithQuaternions.csv', header = [0,1], index_col = [0,1,2])
-# imuSensors = IMUSensors(imuSensorsDataFrame)
-# idx = pd.IndexSlice
-# identifier.pop('activityName')   # remove activityName from keys
-# sensors = []
-# for sensorName in sensorNames:
-#     identifier['sensor'] = sensorName
-#     sensorDf = imuSensors.singleSensorDf(sensorName).loc[idx[person, session], :]
-#     sensors.append(Sensor(sensorDf, identifier = identifier, sensorChannels = sensorChannels))
 
 # setup aggregation Module
 reasoner = Reasoner(reasonerSelectionStartegy)
+
+errorsDf = pd.read_csv(f'{activityCategory}_errors.csv', header = [0,1], index_col = [0,1])
+print(f'\n{activityCategory}_errors.csv LOADED')
 
 print('\nSYSTEM SETUP COMPLETE')
 #*****************************************************************************
@@ -123,7 +114,12 @@ for t in range(tiSim, tfSim):
             activityModuleId = {'sensor' : sensorName, 'activityCategory' : activityCategory, 'activityName' : activityName}         
             errorsAndIds.append([activityError, activityModuleId]) # append the errorAndId, format required by the classifier input 
             sensorSystemsErrors[i,t - tiSim,j] =  activityError #  store errors for plot t timestep, i sensor system, , j activity module
-        selectedActivityId[t - tiSim,i] = classifiers[i].classify(errorsAndIds)   # get the activityId chosen by the classifier at the curent timestep
+        
+        if min(errorsAndIds[0][:]) > errorThreshold:
+            selectedActivityId[t - tiSim,i] = {'sensor' : sensorName, 'activityCategory' : activityCategory, 'activityName' : 'nullActivity'}
+        else:
+            selectedActivityId[t - tiSim,i] = classifiers[i].classify(errorsAndIds)   # get the activityId chosen by the classifier at the curent timestep
+        
         windowSelectors[i].appendId(selectedActivityId[t - tiSim,i]) # append the selected activity id to the window buffer
         if windowSelectors[i].isFull():   
             windowSelectedActivityId[(t - tiSim) // windowLength, i] = windowSelectors[i].selectIdAndClearBuffer()

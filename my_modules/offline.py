@@ -658,7 +658,7 @@ class PyPlotter(object):
             plt.show()
 
     
-    def plotSensorSystemErrorsV2(self,  activityNames, sensorName, sensorSystemErrors, selectedActivityName, tiPlot, tfPlot, figsize = (400,10), top = 2, toFile = False, windowLength = 1):
+    def plotSensorSystemErrorsV2(self,  activityNames, sensorName, sensorSystemErrors, selectedActivityName, tiPlot, tfPlot, figsize = (400,10), top = 2, toFile = False, windowLength = 1, majorTicks = 5, minorTicks = 1):
         """ plot the errors, the ground truth and the predicted labels of a sensor system
         
         Parameters
@@ -682,15 +682,17 @@ class PyPlotter(object):
 
         #activityNames = [activityModule.identifier['activityName'] for activityModule in sensorSystem.activityModules]
         fig = plt.figure(figsize=figsize)
-        ax = fig.add_subplot(1, 1, 1)
+        ax2 = fig.add_subplot(2, 1, 2)
 
         # plot the errors of all the activity modules that compose the sensor system
         for i in range(sensorSystemErrors.shape[-1]):
             activityId = self.activities.dict[self.activityCategory][activityNames[i]]
-            plt.plot(np.array(range(tiPlot, tfPlot))/self.groundTruthFreq,   #   sensor errors timesteps are at sensor frequency 
+            ax2.plot(np.array(range(tiPlot, tfPlot))/self.groundTruthFreq,   #   sensor errors timesteps are at sensor frequency 
                      sensorSystemErrors[tiPlot-self.tiSim:tfPlot-self.tiSim, i], 
                      self.colorDict[self.activityCategory][activityId], label=activityNames[i])
         
+        ax1 = fig.add_subplot(2, 1, 1)
+
         # find the slices of the groudtruth (groundtruth is at sensor frequency)
         idx = pd.IndexSlice
         trueLablesSequence = self.imuSensorsDataFrame.loc[idx[self.person, self.session, :], idx['labels', self.activityCategory]].values[tiPlot:tfPlot]
@@ -707,7 +709,7 @@ class PyPlotter(object):
 
         # plot the groundtruth labels as background colors in the top half of the plot 
         for i, item in enumerate(trueSlices):
-            plt.axvspan((item.start + tiPlot)/self.groundTruthFreq, (item.stop + tiPlot)/self.groundTruthFreq,   # divide by the sensor frequency to obtain the time in seconds                          
+            ax1.axvspan((item.start + tiPlot)/self.groundTruthFreq, (item.stop + tiPlot)/self.groundTruthFreq,   # divide by the sensor frequency to obtain the time in seconds                          
                         facecolor=self.colorDict[self.activityCategory][trueLabels[i]], 
                         #alpha=0.3, 
                         ymin=0, ymax=0.5)
@@ -716,26 +718,40 @@ class PyPlotter(object):
         for i, item in enumerate(predictedSlices):
             # divide tiPlot by the sensor frequency to obtain the time in seconds at which the first slice starts, the predicted labels are saved
             # at predfrequency = sensorfrequency / windowlength  
-            plt.axvspan((item.start/predfreq + tiPlot/self.groundTruthFreq), (item.stop/predfreq + tiPlot/self.groundTruthFreq),                            
+            ax1.axvspan((item.start/predfreq + tiPlot/self.groundTruthFreq), (item.stop/predfreq + tiPlot/self.groundTruthFreq),                            
                         facecolor=self.colorDict[self.activityCategory][predictedLabels[i]], 
                         #alpha=0.3, 
                         ymin=0.5, ymax=1)
 
-        plt.text(tiPlot/self.groundTruthFreq, 0.75*top, r'PREDICTED', fontsize = 20)
-        plt.text(tiPlot/self.groundTruthFreq, 0.25*top, r'TRUE', fontsize = 20)  
+        ax1.text(tiPlot/self.groundTruthFreq, 0.75*top, r'PREDICTED', fontsize = 20)
+        ax1.text(tiPlot/self.groundTruthFreq, 0.25*top, r'TRUE', fontsize = 20)  
         
-        major_ticks = np.arange(tiPlot/self.groundTruthFreq, tfPlot/self.groundTruthFreq, 1)
-        minor_ticks = np.arange(tiPlot/self.groundTruthFreq, tfPlot/self.groundTruthFreq, 0.5)
-        ax.set_xticks(major_ticks)
-        ax.set_xticks(minor_ticks, minor=True)
-        plt.grid(b=True, which='both', axis='x')
+        major_ticks = np.arange(tiPlot/self.groundTruthFreq, tfPlot/self.groundTruthFreq, majorTicks)
+        minor_ticks = np.arange(tiPlot/self.groundTruthFreq, tfPlot/self.groundTruthFreq, minorTicks)
 
-        plt.xlim(left=tiPlot/self.groundTruthFreq)
-        plt.ylim(top=top, bottom = 0)
+        ax1.set_xticks(major_ticks)
+        ax1.set_xticks(minor_ticks, minor=True)
+        ax1.set_yticklabels([])
 
-        plt.xlabel('seconds')
+        ax2.set_xticks(major_ticks)
+        ax2.set_xticks(minor_ticks, minor=True)
 
-        plt.legend(loc = 'upper left')
+        ax1.grid(b=True, which='both', axis='x')
+        ax2.grid(b=True, which='both', axis='x')
+
+        ax1.set_xlim(left=tiPlot/self.groundTruthFreq, right = tfPlot/self.groundTruthFreq)
+        ax1.set_ylim(top=2, bottom = 0)
+        
+        ax2.set_xlim(left=tiPlot/self.groundTruthFreq, right = tfPlot/self.groundTruthFreq)
+        ax2.set_ylim(top=top, bottom = 0)
+
+        ax2.set_xlabel('seconds')
+        ax2.set_ylabel('prediction err')
+       
+        handles, labels = ax2.get_legend_handles_labels()
+        ax1.legend(handles, labels, loc='upper right')
+        ax2.legend(handles, labels, loc='upper right')
+
 
         if toFile:
             self.simulationResults.saveSensorPlotImage(plt, sensorName)
@@ -744,7 +760,7 @@ class PyPlotter(object):
         else:
             plt.show()
     
-    def plotSelectedVsTrue(self, selectedActivityName, tiPlot, tfPlot, figsize = (400,10), top = 2, toFile = False, windowLength = 1):
+    def plotSelectedVsTrue(self, selectedActivityName, tiPlot, tfPlot, figsize = (400,10), top = 2, toFile = False, windowLength = 1, majorTicks = 5, minorTicks = 1 ):
         predfreq = self.groundTruthFreq / windowLength
 
         fig = plt.figure(figsize=figsize)
@@ -778,8 +794,8 @@ class PyPlotter(object):
         plt.text(tiPlot/self.groundTruthFreq, 0.75*top, r'PREDICTED', fontsize = 20)
         plt.text(tiPlot/self.groundTruthFreq, 0.25*top, r'TRUE', fontsize = 20)  
                 
-        major_ticks = np.arange(tiPlot/self.groundTruthFreq, tfPlot/self.groundTruthFreq, 1)
-        minor_ticks = np.arange(tiPlot/self.groundTruthFreq, tfPlot/self.groundTruthFreq, 0.5)
+        major_ticks = np.arange(tiPlot/self.groundTruthFreq, tfPlot/self.groundTruthFreq, majorTicks)
+        minor_ticks = np.arange(tiPlot/self.groundTruthFreq, tfPlot/self.groundTruthFreq, minorTicks)
         ax.set_xticks(major_ticks)
         ax.set_xticks(minor_ticks, minor=True)
         plt.grid(b=True, which='both', axis='x')
