@@ -3,6 +3,7 @@
 import pandas as pd
 import numpy as np
 import os
+import argparse
 
 import my_modules.preprocessdata
 import my_modules.nndata
@@ -24,6 +25,15 @@ from my_modules.evaluation import Results
 # from nnmodelsV4 import NNModel, LSTMModelFactory, BaseCallbacksListFactory, saveNNModel
 # from evaluation import Results
 
+# Define the parser
+parser = argparse.ArgumentParser(description='Multisensor Training and Evaluation')
+
+# Declare an argument (`--algo`), telling that the corresponding value should be stored in the `algo` field, and using a default value if the argument isn't given
+parser.add_argument('--actcat', action="store", dest='activityCategory', default='Locomotion')
+
+# Now, parse the command line arguments and store the values in the `args` variable
+args = parser.parse_args() # Individual arguments can be accessed as attributes of this object
+
 # Import dataframe with all IMU sensors and labels 
 imuSensorsDataFrame = pd.read_csv('imuSensorsWithQuaternions.csv', header = [0,1], index_col = [0,1,2])
 
@@ -31,7 +41,7 @@ imuSensorsDataFrame = pd.read_csv('imuSensorsWithQuaternions.csv', header = [0,1
 imuSensorsDataFrame = imuSensorsDataFrame.fillna(0)
 
 # User (set sensor, activity category)
-activityCategory = 'LeftArmLabel'
+activityCategory = args.activityCategory
 sensors = ['backImu', 'rlaImu', 'ruaImu', 'llaImu', 'luaImu', 'rtImu']
 
 # Grid Search (model hyperparameters)

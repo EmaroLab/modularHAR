@@ -658,7 +658,7 @@ class PyPlotter(object):
             plt.show()
 
     
-    def plotSensorSystemErrorsV2(self,  activityNames, sensorName, sensorSystemErrors, selectedActivityName, tiPlot, tfPlot, figsize = (400,10), top = 2, toFile = False, windowLength = 1, majorTicks = 5, minorTicks = 1):
+    def plotSensorSystemErrorsV2(self,  activityNames, sensorName, sensorSystemErrors, selectedActivityName, tiPlot, tfPlot, figsize = (20,10), top = 2, toFile = False, windowLength = 1, majorTicks = 5, minorTicks = 1):
         """ plot the errors, the ground truth and the predicted labels of a sensor system
         
         Parameters
@@ -681,6 +681,7 @@ class PyPlotter(object):
         predfreq = self.groundTruthFreq / windowLength
 
         #activityNames = [activityModule.identifier['activityName'] for activityModule in sensorSystem.activityModules]
+        
         fig = plt.figure(figsize=figsize)
         ax2 = fig.add_subplot(2, 1, 2)
 
@@ -723,8 +724,8 @@ class PyPlotter(object):
                         #alpha=0.3, 
                         ymin=0.5, ymax=1)
 
-        ax1.text(tiPlot/self.groundTruthFreq, 0.75*top, r'PREDICTED', fontsize = 20)
-        ax1.text(tiPlot/self.groundTruthFreq, 0.25*top, r'TRUE', fontsize = 20)  
+        ax1.text(tiPlot/self.groundTruthFreq, 0.75, r'PREDICTED', fontsize = 20)
+        ax1.text(tiPlot/self.groundTruthFreq, 0.25, r'TRUE', fontsize = 20)  
         
         major_ticks = np.arange(tiPlot/self.groundTruthFreq, tfPlot/self.groundTruthFreq, majorTicks)
         minor_ticks = np.arange(tiPlot/self.groundTruthFreq, tfPlot/self.groundTruthFreq, minorTicks)
@@ -740,7 +741,7 @@ class PyPlotter(object):
         ax2.grid(b=True, which='both', axis='x')
 
         ax1.set_xlim(left=tiPlot/self.groundTruthFreq, right = tfPlot/self.groundTruthFreq)
-        ax1.set_ylim(top=2, bottom = 0)
+        ax1.set_ylim(top=1, bottom = 0)
         
         ax2.set_xlim(left=tiPlot/self.groundTruthFreq, right = tfPlot/self.groundTruthFreq)
         ax2.set_ylim(top=top, bottom = 0)
@@ -753,6 +754,116 @@ class PyPlotter(object):
         ax2.legend(handles, labels, loc='upper right')
 
 
+        if toFile:
+            self.simulationResults.saveSensorPlotImage(plt, sensorName)
+            #plt.savefig(f"{sensorName}_errorplot.png", bbox_inches ='tight')
+            #plt.close(fig) 
+        else:
+            plt.show()
+    
+    def plotSensorSystemErrorsV3(self,  activityNames, sensorName, sensorSystemErrors, selectedActivityName, tiPlot, tfPlot, figsize = None, top = 2, toFile = False, windowLength = 1, majorTicks = 5, minorTicks = 1):
+        """ plot the errors, the ground truth and the predicted labels of a sensor system
+        
+        Parameters
+        ----------
+        sensorSystem : SingleSensorSystem (offline module object)
+
+        sensorSystemErrors : numpay array (shape = (timesteps, num of ActivityModules))
+            the errors timsteps of all the activity modules in the sensor system 
+        selectedActivityName : list of str
+            the list of the activities selected by the classifier
+        tiPlot: int 
+            the intial time step of the plot
+        tfPlot : int
+            the final time step of the plot
+        top : int, optional 
+            the upper limit of the y axis
+        toFile : bool
+            if true the plot instead of being shown is saved to file
+        """
+        predfreq = self.groundTruthFreq / windowLength
+
+        #activityNames = [activityModule.identifier['activityName'] for activityModule in sensorSystem.activityModules]
+        if figsize == None:
+            figsize = (20, 5 + 5 * len(activityNames))
+        fig = plt.figure(figsize=figsize)
+
+        errAxList = []
+        numOfActivityModules = sensorSystemErrors.shape[-1]
+        for i in range(numOfActivityModules): # for all the activity modules that compose the sensor system
+            errAxList.append(fig.add_subplot(numOfActivityModules + 1, 1, i + 2)) # start from second plot
+
+        # plot the errors of all the activity modules that compose the sensor system
+        for i in range(numOfActivityModules):
+            activityId = self.activities.dict[self.activityCategory][activityNames[i]]
+            errAxList[i].plot(np.array(range(tiPlot, tfPlot))/self.groundTruthFreq,   #   sensor errors timesteps are at sensor frequency 
+                     sensorSystemErrors[tiPlot-self.tiSim:tfPlot-self.tiSim, i], 
+                     self.colorDict[self.activityCategory][activityId], label=activityNames[i])
+        
+        ax1 = fig.add_subplot(numOfActivityModules + 1, 1, 1)
+
+        # find the slices of the groudtruth (groundtruth is at sensor frequency)
+        idx = pd.IndexSlice
+        trueLablesSequence = self.imuSensorsDataFrame.loc[idx[self.person, self.session, :], idx['labels', self.activityCategory]].values[tiPlot:tfPlot]
+        trueMultiLabelSequence = MultiLabelSequence(trueLablesSequence)
+        trueSlices, trueLabels = trueMultiLabelSequence.getSlicesAndLabelsLists()
+
+        # find the slices of the predicted labels
+        activityNumId = [self.activities.dict[self.activityCategory][activityName] for activityName in selectedActivityName]
+        
+        # the activity id is saved in list (frequency = sensorfrequency / windowlength) starting from tiSim timestep, 
+        # here select subsequences starting from the index correspondin to tiPlot timstep
+        predictedMultiLabelSequence = MultiLabelSequence(activityNumId[(tiPlot-self.tiSim)//windowLength:(tfPlot-self.tiSim)//windowLength])     
+        predictedSlices, predictedLabels = predictedMultiLabelSequence.getSlicesAndLabelsLists()
+
+        # plot the groundtruth labels as background colors in the top half of the plot 
+        for i, item in enumerate(trueSlices):
+            ax1.axvspan((item.start + tiPlot)/self.groundTruthFreq, (item.stop + tiPlot)/self.groundTruthFreq,   # divide by the sensor frequency to obtain the time in seconds                          
+                        facecolor=self.colorDict[self.activityCategory][trueLabels[i]], 
+                        #alpha=0.3, 
+                        ymin=0, ymax=0.5)
+
+        # plot the predicted labels as background colors in the bottom half of the plot 
+        for i, item in enumerate(predictedSlices):
+            # divide tiPlot by the sensor frequency to obtain the time in seconds at which the first slice starts, the predicted labels are saved
+            # at predfrequency = sensorfrequency / windowlength  
+            ax1.axvspan((item.start/predfreq + tiPlot/self.groundTruthFreq), (item.stop/predfreq + tiPlot/self.groundTruthFreq),                            
+                        facecolor=self.colorDict[self.activityCategory][predictedLabels[i]], 
+                        #alpha=0.3, 
+                        ymin=0.5, ymax=1)
+
+              
+        
+        ax1.set_yticks([0.25, 0.75])
+        ax1.set_yticklabels(['TRUE', 'PREDICTED'], rotation = 90, fontsize = 20, verticalalignment = 'center') #
+        ax1.set_xlabel('seconds')
+
+        major_ticks = np.arange(tiPlot/self.groundTruthFreq, tfPlot/self.groundTruthFreq, majorTicks)
+        minor_ticks = np.arange(tiPlot/self.groundTruthFreq, tfPlot/self.groundTruthFreq, minorTicks)
+
+        ax1.set_xticks(major_ticks)
+        ax1.set_xticks(minor_ticks, minor=True)
+        #ax1.grid(b=True, which='both', axis='x')
+        ax1.grid(False)   
+        ax1.set_xlim(left=tiPlot/self.groundTruthFreq, right = tfPlot/self.groundTruthFreq)
+        ax1.set_ylim(top=1, bottom = 0)
+        
+        
+        #handles, labels = errAxList[0].get_legend_handles_labels()
+        #ax1.legend(handles, labels, loc='upper right')
+
+        for i in range(sensorSystemErrors.shape[-1]):
+            errAxList[i].set_xticks(major_ticks)
+            errAxList[i].set_xticks(minor_ticks, minor=True)            
+            #errAxList[i].grid(b=True, which='both', axis='x') 
+            errAxList[i].grid(False)          
+            errAxList[i].set_xlim(left=tiPlot/self.groundTruthFreq, right = tfPlot/self.groundTruthFreq)
+            errAxList[i].set_ylim(top=top, bottom = 0)
+            errAxList[i].set_xlabel('seconds')
+            errAxList[i].set_ylabel('prediction err', fontsize = 20)
+            errAxList[i].legend(loc='upper right')
+            
+       
         if toFile:
             self.simulationResults.saveSensorPlotImage(plt, sensorName)
             #plt.savefig(f"{sensorName}_errorplot.png", bbox_inches ='tight')
@@ -791,17 +902,23 @@ class PyPlotter(object):
                         #alpha=0.3, 
                         ymin=0.5, ymax=1)
 
-        plt.text(tiPlot/self.groundTruthFreq, 0.75*top, r'PREDICTED', fontsize = 20)
-        plt.text(tiPlot/self.groundTruthFreq, 0.25*top, r'TRUE', fontsize = 20)  
+        #plt.text(tiPlot/self.groundTruthFreq, 0.75, r'PREDICTED', fontsize = 20, color='white')
+        #plt.text(tiPlot/self.groundTruthFreq, 0.25, r'TRUE', fontsize = 20, color='white')  
                 
         major_ticks = np.arange(tiPlot/self.groundTruthFreq, tfPlot/self.groundTruthFreq, majorTicks)
         minor_ticks = np.arange(tiPlot/self.groundTruthFreq, tfPlot/self.groundTruthFreq, minorTicks)
         ax.set_xticks(major_ticks)
         ax.set_xticks(minor_ticks, minor=True)
-        plt.grid(b=True, which='both', axis='x')
+        ax.set_xlim(left=tiPlot/self.groundTruthFreq, right = tfPlot/self.groundTruthFreq)
+        #plt.grid(b=True, which='both', axis='x')
+        plt.grid(False)
+
 
         plt.xlim(left=tiPlot/self.groundTruthFreq)
-        plt.ylim(top=top, bottom = 0)
+        plt.ylim(top=1, bottom = 0)
+        
+        ax.set_yticks([0.25, 0.75])
+        ax.set_yticklabels(['TRUE', 'PREDICTED'], rotation = 90, fontsize = 20, verticalalignment = 'center')
         
         plt.xlabel('seconds')
 
@@ -812,7 +929,7 @@ class PyPlotter(object):
             markers.append(plt.Line2D([0,0],[0,0], color=color, marker='o', linestyle=''))
             markerLabels.append(activityName)
         
-        plt.legend(markers, markerLabels, numpoints=1, loc = 'upper left')
+        plt.legend(markers, markerLabels, numpoints=1, loc = 'upper right')
 
 
         if toFile:
@@ -843,6 +960,12 @@ class SimulationResults(object):
         filepath =  os.path.join(folderPath, f"{sensorName}_confusion_matrix.csv")
         confusionMatrix.to_csv(filepath)
     
+    def loadSensorConfusionMatrixDf(self, sensorName):
+        folderPath = os.path.join(self.rootPath, "confusion_matrix")        
+        filepath =  os.path.join(folderPath, f"{sensorName}_confusion_matrix.csv")
+        return pd.read_csv(filepath, header = [0], index_col = [0])
+        
+
     def saveMaxVotingConfusionMatrixDf(self, confusionMatrix):
         # Save to sensor filepath
         folderPath = os.path.join(self.rootPath, "confusion_matrix")
@@ -855,6 +978,12 @@ class SimulationResults(object):
         filepath =  os.path.join(folderPath, 'max_voting_confusion_matrix.csv')
         confusionMatrix.to_csv(filepath)
     
+    def loadMaxVotingConfusionMatrixDf(self):
+        folderPath = os.path.join(self.rootPath, "confusion_matrix")
+        filepath =  os.path.join(folderPath, 'max_voting_confusion_matrix.csv')
+        return pd.read_csv(filepath, header = [0], index_col = [0])
+        
+
     def saveSensorPlotImage(self, plt, sensor):
         # Save to sensor filepath
         folderPath = os.path.join(self.rootPath, "plot_images")

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import argparse
+
 import keras
 import pandas as pd
 import numpy as np
@@ -23,34 +25,60 @@ from my_modules.offline import ActivityModule, Classifier, Sensor, ArgMinStrateg
 # from nnmodelsV4 import NNModel, LSTMModelFactory, BaseCallbacksListFactory, loadNNModel
 # from offline import ActivityModule, Classifier, Sensor, ArgMinStrategy, SingleSensorSystem, PyPlotter, Reasoner, MostFrequentStrategy, WindowSelector
 
+# Define the parser
+parser = argparse.ArgumentParser(description='System Simulation')
+
+# Declare an argument (`--algo`), telling that the corresponding value should be stored in the `algo` field, and using a default value if the argument isn't given
+parser.add_argument('--person', action="store", dest='person', default='P10')
+parser.add_argument('--session', action="store", dest='session', default='S3')
+parser.add_argument('--window', action="store", dest='windowLength', default=1, type = int)
+parser.add_argument('--thresh', action="store", dest='errorThreshold', default=100, type = float)
+parser.add_argument('--actcat', action="store", dest='activityCategory', default='Locomotion')
+parser.add_argument('--sensors', action="append", dest='sensorNames', default=[])
+parser.add_argument('--activities', action="append", dest='activityNames', default=[])
+
+# Now, parse the command line arguments and store the values in the `args` variable
+args = parser.parse_args() # Individual arguments can be accessed as attributes of this object
+
 baseDir = 'NNModels'   # NNModels base directory
 #*****************************************************************************
 #SYSTEM SPECIFICS
-person = 'P10'
-session ='S3'
+person = args.person
+session = args.session
 
 lookback = 15
 sensorChannels = 6
-windowLength = 30
-errorThreshold = 100
+windowLength = args.windowLength
+errorThreshold = args.errorThreshold
 
 if errorThreshold < 1:
-    n = '0' + str(int(errorThreshold * 10))
+    n = '0' + str(int(errorThreshold * 100))
 else:
-    n = str(errorThreshold) 
+    n = str(int(errorThreshold)) 
 
 simulationResultsbaseDir = f'threshold{n}_simulation_results'
 
 # Choose activity category from BothArmsLabel, RightArmLabel, LeftArmLabel, Locomotion
-activityCategory = 'Locomotion' 
-print(f'\nActivity Catgeory: {activityCategory}\n')
+activityCategory = args.activityCategory
+print(f'\nActivity Catgeory: {activityCategory}')
 
 # Choose Sensors among ['backImu' , 'llaImu', 'luaImu', 'rtImu', 'rlaImu', 'ruaImu'] 
-sensorNames = ['backImu' , 'llaImu', 'luaImu', 'rtImu', 'rlaImu', 'ruaImu'] 
+if args.sensorNames:
+    sensorNames = args.sensorNames
+else:
+    sensorNames = ['backImu' , 'llaImu', 'luaImu', 'rtImu', 'rlaImu', 'ruaImu']
+
+print(f'\nSensnor Names:\n {sensorNames}')
 
 # Choose activities among ['Walk', 'SitDown', 'StandUp', 'OpenDoor', 'CloseDoor', 'PourWater', 'DrinkGlass', 'BrushTeeth', 'CleanTable']
-activityNames = ['Walk', 'SitDown', 'StandUp']
-print('\nSELECTED activity names:\n', activityNames, '\n')
+if args.activityNames:
+    activityNames = args.activityNames
+else:
+    activities = Activities()
+    activityNames = activities.getNamesWithCategory(activityCategory)
+#activityNames = ['Walk', 'SitDown', 'StandUp']
+
+print(f'\nActivity Names:\n {activityNames}')
 
 classifyStrategy = ArgMinStrategy()
 reasonerSelectionStartegy = MostFrequentStrategy()
@@ -137,13 +165,25 @@ tfPlot = tfSim # times step (30 Hz -> 30 steps per second) sec = timsteps / freq
 
 pyplotter = PyPlotter(tiSim, tfSim, activityCategory, imuSensorsDataFrame, person, session,  windowLength = windowLength, lookback = lookback, baseDir= simulationResultsbaseDir)
 for i, sensorName in enumerate(sensorNames):
-    pyplotter.plotSensorSystemErrorsV2(activityNames, 
+    # pyplotter.plotSensorSystemErrorsV2(activityNames, 
+    #                                  sensorName,
+    #                                  sensorSystemsErrors[i,:,:], 
+    #                                  windowSelectedActivityName[:,i], 
+    #                                  tiPlot, tfPlot,
+    #                                  windowLength=windowLength, 
+    #                                  figsize = (20,10), top = 1, 
+    #                                  toFile = True,
+    #                                  majorTicks = 5, 
+    #                                  minorTicks = 1 )
+
+    pyplotter.plotSensorSystemErrorsV3(activityNames, 
                                      sensorName,
                                      sensorSystemsErrors[i,:,:], 
                                      windowSelectedActivityName[:,i], 
                                      tiPlot, tfPlot,
                                      windowLength=windowLength, 
-                                     figsize = (20,5), top = 2, 
+                                     figsize = None, 
+                                     top = 1, 
                                      toFile = True,
                                      majorTicks = 5, 
                                      minorTicks = 1 )
@@ -152,7 +192,7 @@ pyplotter.plotSelectedVsTrue(windowResultantActivityName,
                              tiPlot, tfPlot, 
                              windowLength=windowLength,
                              figsize = (20, 5), 
-                             top = 2, 
+                             top = 1, 
                              toFile = True,
                              majorTicks = 5, 
                              minorTicks = 1 )
@@ -181,6 +221,7 @@ idx = pd.IndexSlice
 actualLabelsNumIdDf = imuSensorsDataFrame.loc[idx[person, session], idx['labels', activityCategory]] # obtain the session dataframe
 actualLabelsDf = actualLabelsNumIdDf.replace(activityNumToLabelDict, inplace=False)  # replace id numbers with activity labels
 actualLabels = actualLabelsDf.values[tiSim:tfSim]   # select the sequence corresponding to the simulation
+print(len(actualLabels))
 
 # labels predicted by the voting scheme
 maxVotingPredictedLabels = [[ResultantActivityName] * windowLength for ResultantActivityName in windowResultantActivityName] # windowResultantActivityName has one item each windowLengthTimesteps
@@ -195,15 +236,21 @@ maxVotingConfusionMatrixDf.index.name = 'PREDICTED'
 
 # fill max voting confusion matrix
 for i in range(len(maxVotingPredictedLabels)):
-    maxVotingConfusionMatrixDf.loc[idx[maxVotingPredictedLabels[i]], idx[actualLabels[i]]] += 1
+    if actualLabels[i] not in activityNames:
+        columnName = 'nullActivity'
+    else:
+        columnName = actualLabels[i]
+
+    maxVotingConfusionMatrixDf.loc[idx[maxVotingPredictedLabels[i]], idx[columnName]] += 1
 
 simulationResults.saveMaxVotingConfusionMatrixDf(maxVotingConfusionMatrixDf) 
 # maxVotingConfusionMatrixDf.to_csv(f'max_voting_confusion_matrix.csv')
 
 
 for i, sensor in enumerate(sensorNames):
-    # labels predicted by i-th sensor module
-    sensorPredictedLabels = windowSelectedActivityName[:,i]
+    sensorPredictedLabels = [[ResultantActivityName] * windowLength for ResultantActivityName in windowSelectedActivityName[:,i]]
+    sensorPredictedLabels = list(itertools.chain.from_iterable(sensorPredictedLabels))
+    print(len(sensorPredictedLabels))
 
     # initialize i-th sensor confusion matrix
     sensorConfusionMatrixDf = pd.DataFrame(np.zeros((n,n)), columns = activityNamesWithNullActivity, index = activityNamesWithNullActivity)
@@ -212,7 +259,12 @@ for i, sensor in enumerate(sensorNames):
 
     # fill i-th sensor confusion matrix
     for i in range(len(sensorPredictedLabels)):
-        sensorConfusionMatrixDf.loc[idx[sensorPredictedLabels[i]], idx[actualLabels[i]]] += 1
+        if actualLabels[i] not in activityNames:
+            columnName = 'nullActivity'
+        else:
+            columnName = actualLabels[i]
+
+        sensorConfusionMatrixDf.loc[idx[sensorPredictedLabels[i]], idx[columnName]] += 1
 
     simulationResults.saveSensorConfusionMatrixDf(sensorConfusionMatrixDf, sensor)
     #sensorConfusionMatrixDf.to_csv(f'{sensor}_confusion_matrix.csv')

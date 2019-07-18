@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 
+import argparse
+
 import keras
 import pandas as pd
 import numpy as np
 import itertools
+
 
 import my_modules.preprocessdata
 import my_modules.nnmodelsV4
@@ -23,6 +26,15 @@ from my_modules.offline import ActivityModule, Classifier, Sensor, ArgMinStrateg
 # from nnmodelsV4 import NNModel, LSTMModelFactory, BaseCallbacksListFactory, loadNNModel
 # from offline import ActivityModule, Classifier, Sensor, ArgMinStrategy, SingleSensorSystem, PyPlotter, Reasoner, MostFrequentStrategy, WindowSelector
 
+# Define the parser
+parser = argparse.ArgumentParser(description='System Save Errors')
+
+# Declare an argument (`--algo`), telling that the corresponding value should be stored in the `algo` field, and using a default value if the argument isn't given
+parser.add_argument('--actcat', action="store", dest='activityCategory', default='Locomotion')
+
+# Now, parse the command line arguments and store the values in the `args` variable
+args = parser.parse_args() # Individual arguments can be accessed as attributes of this object
+
 baseDir = 'NNModels'   # NNModels base directory
 
 #*****************************************************************************
@@ -38,7 +50,7 @@ lookback = 15
 sensorChannels = 6
 
 # Choose activity category from BothArmsLabel, RightArmLabel, LeftArmLabel, Locomotion
-activityCategory = 'LeftArmLabel' 
+activityCategory = args.activityCategory
 
 print(f'\n{activityCategory}\n')
 

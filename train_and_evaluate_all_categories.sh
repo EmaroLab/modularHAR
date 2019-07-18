@@ -1,4 +1,4 @@
-./multisensor_training_and_evaluation_RightArm.sh
-./multisensor_training_and_evaluation_LeftArm.sh
-./multisensor_training_and_evaluation_Locomotion.sh
-./multisensor_training_and_evaluation_BothArms.sh 
+./multisensor_training_and_evaluation.sh --actcat Locomotion
+./multisensor_training_and_evaluation.sh --actcat LeftArmLabel
+./multisensor_training_and_evaluation.sh --actcat RightArmLabel
+./multisensor_training_and_evaluation.sh --actcat BothArmsLabel 
